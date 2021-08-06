@@ -186,7 +186,7 @@ if __name__ == "__main__":
                     [
                         sg.Image(filename="MD.png", key="-MD-"),
                         sg.Text("Minería de Datos GUI", font=("Helvetica", 25), text_color='#2ECCFA'),
-                        sg.Image(filename="UNAM3.png", key="-UNAM-")
+                        sg.Image(filename="UNAM.png", key="-UNAM-")
                     ],
                     [
                         sg.Text("Selecciona un archivo", font=(None, 15)),
