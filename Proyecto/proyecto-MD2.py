@@ -11,12 +11,44 @@ from sklearn.preprocessing import StandardScaler            # Para estandarizaci
 from sklearn.decomposition import PCA
 from sklearn.cluster import KMeans                          # Para clustering
 from sklearn.metrics import pairwise_distances_argmin_min
+from sklearn import linear_model                            # Generar modelo de regresión
+from sklearn import model_selection
+from sklearn.metrics import classification_report
+#from sklearn.metrics import confusion_matrix
+from sklearn.metrics import accuracy_score
+from sklearn.metrics import mean_squared_error, r2_score, max_error, mean_absolute_error 
 from kneed import KneeLocator
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from mpl_toolkits.mplot3d import Axes3D
 
 types, data, nulos, tempList = [], [], [], []
 headVal = ["Eigenvalues"]
+
+def predictWindow(layout, varPred, Clasificacion):
+    windowP = sg.Window('Prediccion Lgistica ', 
+                       layout,
+                       finalize=True,  
+                       font='Helvetica 12',
+                       grab_anywhere=False,
+                       size=(800, 500))
+
+    while True:
+        event, values = windowP.read()
+        if event == "Exit" or event == sg.WIN_CLOSED:
+            break
+        if event == "PronosticCalc":
+            valuesIn = {}
+            for val in varPred:
+                valuesIn[val] = [float(values[val])]
+                windowP.FindElement(val).Update("")
+            PronosticDF = pd.DataFrame(valuesIn)
+            pronosticVal = Clasificacion.predict(PronosticDF)[0]
+            sg.popup('Pronostico ' + pronosticVal)
+
+
+
+    windowP.close()
+        
 
 def plot_relacion(df):
     fig = plt.figure(figsize=(7,4))
@@ -317,8 +349,84 @@ def new_window():
     variable_layout =   [
                             [
                                 sg.Text("Definición de variables", font=('Helvetica', 15), size=(30,1))
+                            ],
+                            [
+                                sg.Text("Variables Predictoras", font=('Helvetica', 12)),
+                                sg.In(size=(10, 1), enable_events=True, key="-VarPred-")
+                            ],
+                            [
+                                sg.Text("Variable Clase", font=('Helvetica', 12)),
+                                sg.In(size=(10, 1), enable_events=True, key="-VarClass-"),
+                                sg.Button("Definir", key="VarDef")
+                            ],
+                            [
+                                sg.Text("Variables Predictoras", font=('Helvetica', 10), size=(30,1))
+                            ],
+                            [
+                                sg.Table(values=NormDF,
+                                headings=header_num,
+                                display_row_numbers=False,
+                                auto_size_columns=False,
+                                num_rows=min(5, len(NormDF)),
+                                alternating_row_color='lightblue',
+                                key="-VarPredDF-")
+                            ],
+                            [
+                                sg.Text("Variable Clase", font=('Helvetica', 10), size=(30,1))
+                            ],
+                            [
+                                sg.Table(values=NormDF,
+                                headings=header_num,
+                                display_row_numbers=False,
+                                auto_size_columns=False,
+                                num_rows=min(5, len(NormDF)),
+                                alternating_row_color='lightblue',
+                                key="-VarClassDF-")
                             ]
                         ]
+
+    lineal_layout = [
+                        [
+                            sg.Text("Regresión Lineal Múltiple", font=('Helvetica', 15), size=(30,1))
+                        ],
+                        [
+                            sg.Button("Entrenar",key="TrainLineal")
+                        ],
+                        [
+                            sg.Table(values=NormDF,
+                            headings=header_pronostico,
+                            display_row_numbers=False,
+                            auto_size_columns=False,
+                            num_rows=min(5, len(NormDF)),
+                            alternating_row_color='lightblue',
+                            key="-LinealPronostic-")
+                        ],
+                        [
+                            sg.Text("Modelo de Regresión", font=('Helvetica', 12), size=(30,1))
+                        ],
+                        [
+                            sg.Text(font=('Helvetica', 10), size=(30,7), key="InfoRegresion")
+                        ]
+                    ]
+    logistica_layout = [
+                        [
+                            sg.Text("Regresión Logística", font=('Helvetica', 15), size=(30,1))
+                        ],
+                        [
+                            sg.Text("Semilla Aleatoriedad", font=('Helvetica', 12)),
+                            sg.In(size=(10, 1), enable_events=True, key="seed"),
+                            sg.Button("Entrenar",key="TrainLogistica")
+                        ],
+                        [
+                            sg.Text("Modelo de Regresión", font=('Helvetica', 10), size=(30,1))
+                        ],
+                        [
+                            sg.Text(font=('Helvetica', 10), size=(30,7), key="InfoLogistica")
+                        ],
+                        [
+                            sg.Text(font=('Helvetica', 15), size=(100,7), key="Modelo")
+                        ]
+                    ]
 
     tab1_Col = [[sg.Column(tab2_layout, scrollable=True, vertical_scroll_only=True, size=(1200, 700))]]
 
@@ -337,7 +445,7 @@ def new_window():
                     [sg.TabGroup([[sg.Tab('Clustering Particional', CP_layout), sg.Tab('Etiquetado', Particional_layout), sg.Tab('Centroides', Centroides_layout)]])]
                 ]
     tabGroupClasificacion = [
-                    [sg.TabGroup([[sg.Tab('Definición de variables', variable_layout)]])]
+                    [sg.TabGroup([[sg.Tab('Definición de variables', variable_layout), sg.Tab('Regresión Lineal', lineal_layout), sg.Tab('Regresión Logística', logistica_layout)]])]
                 ]
 
     layout = [
@@ -392,7 +500,6 @@ def new_window():
                     tempDataFrame = pd.DataFrame(dfTemp, columns=df.columns)
                     window.FindElement("-Norm-").Update(values=tempDataFrame.values.tolist())
                     window.FindElement("-Norm-").Update(num_rows=min(30, len(tempDataFrame.values.tolist())))
-                    # Suburb Address Type Method SellerG Date CouncilArea Regionname
                 except:
                     sg.popup_error('Problema para normalizar datos, verifique que no existan valores tipo string')
             except:
@@ -506,7 +613,63 @@ def new_window():
             ax.scatter(Mdf.iloc[:,0],Mdf.iloc[:,1],Mdf.iloc[:,2], marker="o", c=asignar,s=60)
             ax.scatter(CentroidesP[:,0],CentroidesP[:,1],CentroidesP[:,2], marker="*", c=colorList,s=1000)
             fig_canvas_agg = draw_figure(window['-ClustCenterGraph-'].TKCanvas, fig)
-            #plt.show()
+        if event == "VarDef":
+            varPred = values["-VarPred-"]
+            varClass = values["-VarClass-"]
+            varPred = varPred.split(" ")
+            varClass = varClass.split(" ")
+            X = np.array(df[varPred])
+            Y = np.array(df[varClass])
+            VarPredDF = pd.DataFrame(X)
+            VarClassDF = pd.DataFrame(Y)
+            window.FindElement("-VarPredDF-").Update(values=VarPredDF.values.tolist())
+            window.FindElement("-VarPredDF-").Update(num_rows=min(10, len(VarPredDF.values.tolist())))
+            window.FindElement("-VarClassDF-").Update(values=VarClassDF.values.tolist())
+            window.FindElement("-VarClassDF-").Update(num_rows=min(10, len(VarClassDF.values.tolist())))
+        if event == "TrainLineal":
+            RLMultiple = linear_model.LinearRegression()
+            X_train = X
+            Y_train = Y
+            RLMultiple.fit(X_train, Y_train)
+            Y_pronostico = RLMultiple.predict(X_train)
+            LinealPronostic = df
+            LinealPronostic["Pronostico"] = Y_pronostico
+            window.FindElement("-LinealPronostic-").Update(values=LinealPronostic.values.tolist())
+            window.FindElement("-LinealPronostic-").Update(num_rows=min(10, len(LinealPronostic.values.tolist())))
+
+            infoReg = "Coeficientes: " + str(RLMultiple.coef_) + "\nIntercepto: " + str(RLMultiple.intercept_) + "\nError residual: %.4f" % max_error(Y_train, Y_pronostico) + "\nBondad de ajuste (Score): %.2f" % r2_score(Y_train, Y_pronostico)
+            window.FindElement("InfoRegresion").Update(infoReg)
+        if event == "TrainLogistica":
+            Clasificacion = linear_model.LogisticRegression()
+            seed = int(values["seed"])
+            X_train, X_validation, Y_train, Y_validation = model_selection.train_test_split(X, Y, test_size=0.2, random_state=seed, shuffle = True)
+            Clasificacion.fit(X_train, Y_train)
+            Predicciones = Clasificacion.predict(X_train)
+            exactitud = Clasificacion.score(X_validation, Y_validation)
+            infoLog = "Exactitud: " + str(exactitud) + "\nIntercept: "+ str(Clasificacion.intercept_) + "\nCoeficientes: " + str(Clasificacion.coef_)
+            window.FindElement("InfoLogistica").Update(infoLog)
+
+            model = "a+bX = " +str(Clasificacion.intercept_[0])
+            coeficientes = Clasificacion.coef_[0]
+            for i in range (0,len(coeficientes)):
+                if coeficientes[i] < 0:
+                    model = model + " " + str(coeficientes[i]) + str(varPred[i])
+                else:
+                    model = model + " + " + str(coeficientes[i]) + str(varPred[i])
+            window.FindElement("Modelo").Update(model)
+
+            pred_layout = []
+            for i in varPred:
+                temp = [
+                            sg.Text(i.upper(), font=('Helvetica', 12)),
+                            sg.In(size=(10, 1), enable_events=True, key=i)
+                        ]
+                pred_layout.append(temp)
+            pred_layout.append([sg.Button("Calcular", key="PronosticCalc")])
+
+            predictWindow(pred_layout, varPred, Clasificacion)
+
+
             
 
 
@@ -552,6 +715,7 @@ if __name__ == "__main__":
             header_stat = list(stats.columns)
             header_stat=['Feature']+header_stat
             header_cluster = header_list + ["clusterP"]
+            header_pronostico = header_list + ["Pronostico"]
             try:
                 statsNom = df.describe( include="object").T
                 statisticNom = statsNom.values.tolist()
