@@ -43,7 +43,7 @@ def predictWindow(layout, varPred, Clasificacion):
                 windowP.FindElement(val).Update("")
             PronosticDF = pd.DataFrame(valuesIn)
             pronosticVal = Clasificacion.predict(PronosticDF)[0]
-            sg.popup('Pronostico ' + pronosticVal)
+            sg.popup('Pronostico ' + str(pronosticVal))
 
 
 
@@ -687,6 +687,10 @@ if __name__ == "__main__":
                         sg.Text("Selecciona un archivo", font=(None, 15)),
                         sg.In(size=(30, 1), enable_events=True, key="-FILE-"),
                         sg.FileBrowse(file_types=(("CSV", "*.csv"),("ALL", "*"))),
+                    ],
+                    [   
+                        sg.Checkbox("Table", key='-TableType-'),
+                        sg.Checkbox("CSV", key='-CSVType-')
                     ]
                 ]
 
@@ -699,7 +703,10 @@ if __name__ == "__main__":
         if event == "-FILE-":
             filename = values["-FILE-"]
             #try:
-            df = pd.read_csv(filename)
+            if values["-TableType-"] and not values["-CSVType-"]:
+                df = pd.read_table(filename)
+            else:
+                df = pd.read_csv(filename)
             data = df.values.tolist()
             header_list = df.columns.tolist()
             tipos = df.dtypes.tolist()
