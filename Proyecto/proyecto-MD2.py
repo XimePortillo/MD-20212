@@ -13,6 +13,7 @@ from sklearn.cluster import KMeans                          # Para clustering
 from sklearn.metrics import pairwise_distances_argmin_min
 from kneed import KneeLocator
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from mpl_toolkits.mplot3d import Axes3D
 
 types, data, nulos, tempList = [], [], [], []
 headVal = ["Eigenvalues"]
@@ -287,6 +288,36 @@ def new_window():
                                 alternating_row_color='lightblue',
                                 key="-ClustData1-")
                             ],
+                            [
+                                sg.Canvas(key='-ClustPartGraph-', 
+                                pad=(10,10))
+                            ]
+                        ]
+    Centroides_layout = [
+                            [
+                                sg.Text("Centroides", font=('Helvetica', 15), size=(30,1))
+                            ],
+                            [
+                                sg.Table(values=NormDF,
+                                headings=header_list,
+                                display_row_numbers=False,
+                                auto_size_columns=False,
+                                num_rows=min(5, len(NormDF)),
+                                alternating_row_color='lightblue',
+                                key="-ClustCenter-")
+                            ],
+                            [
+                                sg.Button("Graficar Clusters", key="GraphClust"),
+                            ],
+                            [
+                                sg.Canvas(key='-ClustCenterGraph-', 
+                                pad=(10,10))
+                            ]
+                        ]
+    variable_layout =   [
+                            [
+                                sg.Text("Definición de variables", font=('Helvetica', 15), size=(30,1))
+                            ]
                         ]
 
     tab1_Col = [[sg.Column(tab2_layout, scrollable=True, vertical_scroll_only=True, size=(1200, 700))]]
@@ -303,11 +334,14 @@ def new_window():
                 ]
 
     tabGroupClustering = [
-                    [sg.TabGroup([[sg.Tab('Clustering Particional', CP_layout), sg.Tab('Etiquetado', Particional_layout)]])]
+                    [sg.TabGroup([[sg.Tab('Clustering Particional', CP_layout), sg.Tab('Etiquetado', Particional_layout), sg.Tab('Centroides', Centroides_layout)]])]
+                ]
+    tabGroupClasificacion = [
+                    [sg.TabGroup([[sg.Tab('Definición de variables', variable_layout)]])]
                 ]
 
     layout = [
-        [sg.TabGroup([[sg.Tab('EDA', tabGroupEDA), sg.Tab('Componentes principales', tabGroupPCA), sg.Tab('Clustering', tabGroupClustering)]])]
+        [sg.TabGroup([[sg.Tab('EDA', tabGroupEDA), sg.Tab('Componentes principales', tabGroupPCA), sg.Tab('Clustering', tabGroupClustering), sg.Tab('Regresión', tabGroupClasificacion)]])]
     ]
 
     fn = filename.split('/')[-1]
@@ -431,11 +465,10 @@ def new_window():
             plt.ylabel("SSE")
             plt.title("Elbow Method")
             fig_canvas_agg = draw_figure(window['-ClustPart-'].TKCanvas, fig)
-        #if event == "":
             MParticional = KMeans(n_clusters=elbowVal, random_state=0).fit(Mdf)
             MParticional.predict(Mdf)
             MParticional.labels_
-
+            tempDataFrame = df
             tempDataFrame["clusterP"] = MParticional.labels_
             dataC = tempDataFrame.values.tolist()
             window.FindElement("-ClustData-").Update(values=dataC)
@@ -445,7 +478,35 @@ def new_window():
                 temp.append([i, tempDataFrame.groupby(["clusterP"])["clusterP"].count().tolist()[i]])
             window.FindElement("-ClustData1-").Update(values=temp)
             window.FindElement("-ClustData1-").Update(num_rows=min(5, elbowVal))
-            
+            fig = plt.figure(figsize=(10, 7))
+            plt.scatter(Mdf.iloc[:, 0], Mdf.iloc[:, 1], c=MParticional.labels_, cmap="rainbow")
+            fig_canvas_agg = draw_figure(window['-ClustPartGraph-'].TKCanvas, fig)
+            CentroidesP = MParticional.cluster_centers_
+            tempDF = pd.DataFrame(CentroidesP.round(4),columns=Mdf.columns.tolist())
+            dfTemp = []    
+            for val in tempDF.values.tolist():
+                for i in colValues:
+                    val.insert(i, "-")
+                dfTemp.append(val)
+            tempDataFrame = pd.DataFrame(dfTemp)
+            window.FindElement("-ClustCenter-").Update(values=tempDataFrame.values.tolist())
+            window.FindElement("-ClustCenter-").Update(num_rows=min(20, len(tempDataFrame.values.tolist())))
+        if event == "GraphClust":
+            plt.rcParams["figure.figsize"] = (10,7)
+            plt.style.use("ggplot")
+            colores=["red","blue","green","yellow","purple","cyan","pink","olive"]
+            asignar, colorList = [], []
+            for row in MParticional.labels_:
+              asignar.append(colores[row])
+            for row in range(0,elbowVal):
+              colorList.append(colores[row])
+
+            fig = plt.figure()
+            ax = Axes3D(fig)
+            ax.scatter(Mdf.iloc[:,0],Mdf.iloc[:,1],Mdf.iloc[:,2], marker="o", c=asignar,s=60)
+            ax.scatter(CentroidesP[:,0],CentroidesP[:,1],CentroidesP[:,2], marker="*", c=colorList,s=1000)
+            fig_canvas_agg = draw_figure(window['-ClustCenterGraph-'].TKCanvas, fig)
+            #plt.show()
             
 
 
