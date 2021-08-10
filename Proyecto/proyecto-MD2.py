@@ -352,11 +352,11 @@ def new_window():
                             ],
                             [
                                 sg.Text("Variables Predictoras", font=('Helvetica', 12)),
-                                sg.In(size=(10, 1), enable_events=True, key="-VarPred-")
+                                sg.In(size=(30, 1), enable_events=True, key="-VarPred-")
                             ],
                             [
                                 sg.Text("Variable Clase", font=('Helvetica', 12)),
-                                sg.In(size=(10, 1), enable_events=True, key="-VarClass-"),
+                                sg.In(size=(30, 1), enable_events=True, key="-VarClass-"),
                                 sg.Button("Definir", key="VarDef")
                             ],
                             [
@@ -385,29 +385,6 @@ def new_window():
                             ]
                         ]
 
-    lineal_layout = [
-                        [
-                            sg.Text("Regresión Lineal Múltiple", font=('Helvetica', 15), size=(30,1))
-                        ],
-                        [
-                            sg.Button("Entrenar",key="TrainLineal")
-                        ],
-                        [
-                            sg.Table(values=NormDF,
-                            headings=header_pronostico,
-                            display_row_numbers=False,
-                            auto_size_columns=False,
-                            num_rows=min(5, len(NormDF)),
-                            alternating_row_color='lightblue',
-                            key="-LinealPronostic-")
-                        ],
-                        [
-                            sg.Text("Modelo de Regresión", font=('Helvetica', 12), size=(30,1))
-                        ],
-                        [
-                            sg.Text(font=('Helvetica', 10), size=(30,7), key="InfoRegresion")
-                        ]
-                    ]
     logistica_layout = [
                         [
                             sg.Text("Regresión Logística", font=('Helvetica', 15), size=(30,1))
@@ -445,7 +422,7 @@ def new_window():
                     [sg.TabGroup([[sg.Tab('Clustering Particional', CP_layout), sg.Tab('Etiquetado', Particional_layout), sg.Tab('Centroides', Centroides_layout)]])]
                 ]
     tabGroupClasificacion = [
-                    [sg.TabGroup([[sg.Tab('Definición de variables', variable_layout), sg.Tab('Regresión Lineal', lineal_layout), sg.Tab('Regresión Logística', logistica_layout)]])]
+                    [sg.TabGroup([[sg.Tab('Definición de variables', variable_layout), sg.Tab('Regresión Logística', logistica_layout)]])]
                 ]
 
     layout = [
@@ -556,9 +533,12 @@ def new_window():
             numInf = int(values["-ClustInf-"])
             numSup = int(values["-ClustSup-"])
             SSE =[]
+            Dropdf = df
+            for var in varDep.split(' '):
+                    Dropdf = Dropdf.drop([var], axis=1)
             for i in range(numInf, numSup):
               km = KMeans(n_clusters=i, random_state=0)
-              km.fit(Mdf)
+              km.fit(Dropdf)
               SSE.append(km.inertia_)
             kl = KneeLocator(range(numInf,numSup), SSE, curve="convex", direction="decreasing")
             elbowVal = kl.elbow
@@ -572,8 +552,8 @@ def new_window():
             plt.ylabel("SSE")
             plt.title("Elbow Method")
             fig_canvas_agg = draw_figure(window['-ClustPart-'].TKCanvas, fig)
-            MParticional = KMeans(n_clusters=elbowVal, random_state=0).fit(Mdf)
-            MParticional.predict(Mdf)
+            MParticional = KMeans(n_clusters=elbowVal, random_state=0).fit(Dropdf)
+            MParticional.predict(Dropdf)
             MParticional.labels_
             tempDataFrame = df
             tempDataFrame["clusterP"] = MParticional.labels_
@@ -586,10 +566,10 @@ def new_window():
             window.FindElement("-ClustData1-").Update(values=temp)
             window.FindElement("-ClustData1-").Update(num_rows=min(5, elbowVal))
             fig = plt.figure(figsize=(10, 7))
-            plt.scatter(Mdf.iloc[:, 0], Mdf.iloc[:, 1], c=MParticional.labels_, cmap="rainbow")
+            plt.scatter(Dropdf.iloc[:, 0], Dropdf.iloc[:, 1], c=MParticional.labels_, cmap="rainbow")
             fig_canvas_agg = draw_figure(window['-ClustPartGraph-'].TKCanvas, fig)
             CentroidesP = MParticional.cluster_centers_
-            tempDF = pd.DataFrame(CentroidesP.round(4),columns=Mdf.columns.tolist())
+            tempDF = pd.DataFrame(CentroidesP.round(4),columns=Dropdf.columns.tolist())
             dfTemp = []    
             for val in tempDF.values.tolist():
                 for i in colValues:
@@ -610,7 +590,7 @@ def new_window():
 
             fig = plt.figure()
             ax = Axes3D(fig)
-            ax.scatter(Mdf.iloc[:,0],Mdf.iloc[:,1],Mdf.iloc[:,2], marker="o", c=asignar,s=60)
+            ax.scatter(Dropdf.iloc[:,0],Dropdf.iloc[:,1],Dropdf.iloc[:,2], marker="o", c=asignar,s=60)
             ax.scatter(CentroidesP[:,0],CentroidesP[:,1],CentroidesP[:,2], marker="*", c=colorList,s=1000)
             fig_canvas_agg = draw_figure(window['-ClustCenterGraph-'].TKCanvas, fig)
         if event == "VarDef":
@@ -626,19 +606,6 @@ def new_window():
             window.FindElement("-VarPredDF-").Update(num_rows=min(10, len(VarPredDF.values.tolist())))
             window.FindElement("-VarClassDF-").Update(values=VarClassDF.values.tolist())
             window.FindElement("-VarClassDF-").Update(num_rows=min(10, len(VarClassDF.values.tolist())))
-        if event == "TrainLineal":
-            RLMultiple = linear_model.LinearRegression()
-            X_train = X
-            Y_train = Y
-            RLMultiple.fit(X_train, Y_train)
-            Y_pronostico = RLMultiple.predict(X_train)
-            LinealPronostic = df
-            LinealPronostic["Pronostico"] = Y_pronostico
-            window.FindElement("-LinealPronostic-").Update(values=LinealPronostic.values.tolist())
-            window.FindElement("-LinealPronostic-").Update(num_rows=min(10, len(LinealPronostic.values.tolist())))
-
-            infoReg = "Coeficientes: " + str(RLMultiple.coef_) + "\nIntercepto: " + str(RLMultiple.intercept_) + "\nError residual: %.4f" % max_error(Y_train, Y_pronostico) + "\nBondad de ajuste (Score): %.2f" % r2_score(Y_train, Y_pronostico)
-            window.FindElement("InfoRegresion").Update(infoReg)
         if event == "TrainLogistica":
             Clasificacion = linear_model.LogisticRegression()
             seed = int(values["seed"])
@@ -702,43 +669,42 @@ if __name__ == "__main__":
             break
         if event == "-FILE-":
             filename = values["-FILE-"]
-            #try:
-            if values["-TableType-"] and not values["-CSVType-"]:
-                df = pd.read_table(filename)
-            else:
-                df = pd.read_csv(filename)
-            data = df.values.tolist()
-            header_list = df.columns.tolist()
-            tipos = df.dtypes.tolist()
-            nulls = df.isnull().sum().tolist()
-            for i in range (0, len(tipos)):
-                types.append([header_list[i], tipos[i], nulls[i]])
-            correlaciones = df.corr(method='pearson')
-            headers = correlaciones.columns.tolist()
-            stats = df.describe().T
-            statistic = stats.values.tolist()
-            for i,d in enumerate(statistic):
-                d.insert(0,list(stats.index)[i])
-            header_stat = list(stats.columns)
-            header_stat=['Feature']+header_stat
-            header_cluster = header_list + ["clusterP"]
-            header_pronostico = header_list + ["Pronostico"]
             try:
-                statsNom = df.describe( include="object").T
-                statisticNom = statsNom.values.tolist()
-                for i,d in enumerate(statisticNom):
-                    d.insert(0,list(statsNom.index)[i])
-                header_statNom = list(statsNom.columns)
-                header_statNom =['Feature']+header_statNom
-                flag_obj = 1
+                if values["-TableType-"] and not values["-CSVType-"]:
+                    df = pd.read_table(filename)
+                else:
+                    df = pd.read_csv(filename)
+                data = df.values.tolist()
+                header_list = df.columns.tolist()
+                tipos = df.dtypes.tolist()
+                nulls = df.isnull().sum().tolist()
+                for i in range (0, len(tipos)):
+                    types.append([header_list[i], tipos[i], nulls[i]])
+                correlaciones = df.corr(method='pearson')
+                headers = correlaciones.columns.tolist()
+                stats = df.describe().T
+                statistic = stats.values.tolist()
+                for i,d in enumerate(statistic):
+                    d.insert(0,list(stats.index)[i])
+                header_stat = list(stats.columns)
+                header_stat=['Feature']+header_stat
+                header_cluster = header_list + ["clusterP"]
+                header_pronostico = header_list + ["Pronostico"]
+                try:
+                    statsNom = df.describe( include="object").T
+                    statisticNom = statsNom.values.tolist()
+                    for i,d in enumerate(statisticNom):
+                        d.insert(0,list(statsNom.index)[i])
+                    header_statNom = list(statsNom.columns)
+                    header_statNom =['Feature']+header_statNom
+                    flag_obj = 1
+                except:
+                    flag_obj = 0
+                    pass
+                corr = correlaciones.values.tolist()
+                new_window()
             except:
-                flag_obj = 0
+                sg.popup_error('El archivo seleccionado no puede abrirse')
                 pass
-            corr = correlaciones.values.tolist()
-            new_window()
-            break
-            #except:
-            #    sg.popup_error('El archivo seleccionado no puede abrirse')
-            #    pass
 
     ventana.close()
